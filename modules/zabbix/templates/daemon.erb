@@ -1,0 +1,5 @@
+<% if $::osfamily == 'Debian' %>
+     source  => "puppet:///modules/zabbix/init/zabbix-agent-Debian"
+<% else %>
+     source  => "puppet:///modules/zabbix/init/zabbix-agent-Debian" 
+<% end %>

@@ -1,0 +1,21 @@
+#!/bin/sh
+
+  CONFIG=/usr/local/etc/zabbix/zabbix_agentd.conf
+  DAEMON=/usr/local/sbin/zabbix_agentd
+
+  case "$1" in
+          start)
+                  if [ -f $CONFIG -a -f $DAEMON ]; then
+                          echo 'Starting zabbix_agentd.'
+                          $DAEMON
+                  fi
+                  ;;
+          stop)
+                  echo 'Stopping zabbix_agentd.'
+                  pkill -TERM -x zabbix_agentd
+                  ;;
+          *)
+                  echo "Usage: $0 { start | stop }"
+                  exit 1
+                  ;;
+  esac
