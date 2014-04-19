@@ -5,23 +5,20 @@ class zabbix {
   file { '/tmp/zabbix': ensure => directory; }
 
   # checa a arquitetura do sistema e manda o TAR correto
-  if $::architecture == 'i386' {
-    file { 'zabbix.tar.gz':
-      path    => "/tmp/zabbix/zabbix.tar.gz",
-      ensure  => file,
-      require => File["/tmp/zabbix"],
-      source  => "puppet:///zabbix/files/zabbix_32bit.tar.gz",
-    }
+  #Sugestao Miguel
 
-  } else {
-    file { 'zabbix.tar.gz':
-      path    => "/tmp/zabbix/zabbix.tar.gz",
-      ensure  => file,
-      require => File["/tmp/zabbix"],
-      source  => "puppet:///zabbix/files/zabbix_64bit.tar.gz",
-    }
+if $::architecture == 'i386' {
+   $zabbix_tar = 'zabbix_32bit.tar.gz'
+} else {
+   $zabbix_tar = 'zabbix_64bit.tar.gz'
+}
 
-  }
+file { 'zabbix.tar.gz':
+  path    => "/tmp/zabbix/zabbix.tar.gz",
+  ensure  => file,
+  require => File["/tmp/zabbix"],
+  source  => "puppet:///zabbix/files/${zabbix_tar}",
+}
 
   # Descompacta o Tar enviando anteriormente e cria o diretorio /tmp/zabbix/zabbix-tar
   exec { 'untar-zabbix.tar.gz':
@@ -42,27 +39,21 @@ class zabbix {
   }
 
 #Checa a Familia do SO e manda o script do Daemon correto
-
-if $osfamily == 'Debian' {
-  file { "zabbix-agent":
-    path    => "/etc/init.d/zabbix-agent",
-    ensure  => file,
-    owner   => root,
-    group   => root,
-    content => "puppet:///zabbix/files/init/zabbix-agent-Debian.conf",
-    notify  => Service['zabbix-agent'],
-  }
-
-} else {
-file { "zabbix-agent":
-  path    => "/etc/init.d/zabbix-agent",
-  ensure  => file,
-  owner   => root,
-  group   => root,
-  content => "puppet:///zabbix/files/init/zabbix-agent-RedHat.conf",
-  notify  => Service['zabbix-agent'],
+#Sugestao Miguel
+case $::osfamily {
+ 'Debian', 'RedHat': {
+   file { "zabbix-agent":
+     path    => "/etc/init.d/zabbix-agent",
+     ensure  => file,
+     owner   => root,
+     group   => root,
+     content => "puppet:///zabbix/files/init/zabbix-agent-${::osfamily}.conf",
+     notify  => Service['zabbix-agent'],
+   }
+ }
+ default: { fail('OS nao suportado') }
 }
-}
+
 
 #Mantem o servico
 service { 'zabbix-agent':
