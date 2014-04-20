@@ -1,64 +1,78 @@
 class zabbix {
+  # Send the archives correct for osfamily and architecture.
 
-
-  # Cria o diretorio que ficarao os arquivos do zabbix
-  file { '/tmp/zabbix': ensure => directory; }
-
-  # checa a arquitetura do sistema e manda o TAR correto
-  #Sugestao Miguel
-
-if $::architecture == 'i386' {
-   $zabbix_tar = 'zabbix_32bit.tar.gz'
-} else {
-   $zabbix_tar = 'zabbix_64bit.tar.gz'
-}
-
-file { 'zabbix.tar.gz':
-  path    => "/tmp/zabbix/zabbix.tar.gz",
-  ensure  => file,
-  require => File["/tmp/zabbix"],
-  source  => "puppet:///zabbix/files/${zabbix_tar}",
-}
-
-  # Descompacta o Tar enviando anteriormente e cria o diretorio /tmp/zabbix/zabbix-tar
-  exec { 'untar-zabbix.tar.gz':
-    command => "tar xzf /tmp/zabbix/zabbix.tar.gz",
-    cwd     => "/tmp/zabbix/",
-    creates => "/tmp/zabbix/zabbix-tar",
-    require => File["zabbix.tar.gz"],
-     path => ["/bin/"],
+  if $::osfamily == 'Debian' {
+    $extensao = 'deb'
+  } else {
+    $extensao = 'rpm'
   }
 
+  $pacote = "zabbix-agent_${::osfamily}_${::architecture}.${extensao}"
+
+  file { "zabbix-package":
+    path   => "/tmp/${pacote}",
+    ensure => file,
+    source => "puppet:///zabbix/files/${pacote}",
+  }
+
+  user { 'zabbix':
+    ensure  => present,
+    groups  => 'zabbix',
+    require => Group['zabbix'],
+  }
+
+  group { 'zabbix': ensure => present, }
+
+  # Send the configuration files
   file { "zabbix_agentd.conf":
     path    => "/usr/local/etc/zabbix_agentd.conf",
     ensure  => file,
     owner   => zabbix,
     group   => zabbix,
     source  => "puppet:///zabbix/files/conf/zabbix_agentd/zabbix_agentd.conf",
-    require => File['/tmp/zabbix'],
+    require => [User['zabbix'], Group['zabbix']],
   }
 
-#Checa a Familia do SO e manda o script do Daemon correto
-#Sugestao Miguel
-case $::osfamily {
- 'Debian', 'RedHat': {
-   file { "zabbix-agent":
-     path    => "/etc/init.d/zabbix-agent",
-     ensure  => file,
-     owner   => root,
-     group   => root,
-     content => "puppet:///zabbix/files/init/zabbix-agent-${::osfamily}.conf",
-     notify  => Service['zabbix-agent'],
-   }
- }
- default: { fail('OS nao suportado') }
-}
+  # Check the osfamily and send the script daemon correct
+  case $::osfamily {
+    'Debian', 'RedHat' : {
+      file { "zabbix-agent":
+        path    => "/etc/init.d/zabbix-agent",
+        ensure  => file,
+        owner   => root,
+        group   => root,
+        content => "puppet:///zabbix/files/init/zabbix-agent-${::osfamily}.conf",
+      }
+    }
+    default            : {
+      fail('OS nao suportado')
+    }
+  }
 
+  # exec { 'apt-get':
+  #   command => "/usr/bin/apt-get -f install -y",
+  #   unless  => "/usr/bin/apt-get check",
+  #}
 
-#Mantem o servico
-service { 'zabbix-agent':
-  ensure => running,
-  enable => true,
-}
+  # installing the zabbix-agent package
+  package { '$pacote':
+    ensure          => installed,
+    source          => "/tmp/${pacote}",
+    provider        => 'dpkg',
+    require         => File['zabbix-package'],
+    install_options => ['--force-depends'],
+  # before   => Exec['apt-get'],
+  }
 
+  # package { "libcurl3-gnutls":
+  #  ensure => installed,
+  #  before => Package['$pacote'],
+  #}
+
+  # running service
+  service { 'zabbix-agent':
+    ensure  => running,
+    require => Package['$pacote'],
+    enable  => true,
+  }
 }
