@@ -65,4 +65,3 @@ class zabbix {
   #}
 
   # installing the zabbix-agent package
-}
